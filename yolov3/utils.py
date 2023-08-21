@@ -459,20 +459,33 @@ def detect_video(Yolo, video_path, output_path, input_size=416, show=False, CLAS
 
         image_data = image_preprocess(np.copy(original_image), [input_size, input_size])
         image_data = image_data[np.newaxis, ...].astype(np.float32)
+        # print(f'Image Data = {np.linalg.norm(image_data)}')
+        # temp_variable = input('Enter something: ')
 
         t1 = time.time()
         if YOLO_FRAMEWORK == "tf":
             if tf.__version__ > '2.4.0':
                 pred_bbox = Yolo(image_data, training=False)
+                # print(f'The data type of the image = {type(image_data)}')
+                # print(f'Predicted bounding box = {np.linalg.norm(image_data)}')
+                # temp_variable = input('Version comparison. Enter something: ')
             else:
-                pred_bbox = Yolo.predict(image_data)
+                # pred_bbox = Yolo.predict(image_data)
+                pred_bbox = Yolo(image_data, training=False)
+                # print(f'The data type of the image = {type(pred_bbox)}')
+                # print(f'Image Data = {np.linalg.norm(image_data)}')
+                # print(f'Apparently tf version isnt high enough. predicted bounding box = {pred_bbox}')
+                # temp_variable = input('Enter something: ')
         elif YOLO_FRAMEWORK == "trt":
-            batched_input = tf.constant(image_data)
-            result = Yolo(batched_input)
-            pred_bbox = []
-            for key, value in result.items():
-                value = value.numpy()
-                pred_bbox.append(value)
+          # print(f'The data type of the image = {type(image_data)}')
+          # print(f'Predicted bounding box = {np.linalg.norm(image_data)}')
+          # temp_variable = input('YOLO FRW = trt. Enter something: ')
+          batched_input = tf.constant(image_data)
+          result = Yolo(batched_input)
+          pred_bbox = []
+          for key, value in result.items():
+              value = value.numpy()
+              pred_bbox.append(value)
         
         t2 = time.time()
         
@@ -481,6 +494,9 @@ def detect_video(Yolo, video_path, output_path, input_size=416, show=False, CLAS
 
         bboxes = postprocess_boxes(pred_bbox, original_image, input_size, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
+        # print(f'The data type of the image = {type(image_data)}')
+        # print(f'Apparently tf version isnt high enough. predicted bounding box = {np.linalg.norm(bboxes)}')
+        # temp_variable = input('Enter something: ')
         
         image = draw_bbox(original_image, bboxes, CLASSES=CLASSES, rectangle_colors=rectangle_colors)
 

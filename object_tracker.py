@@ -46,7 +46,8 @@ def Object_tracking(Yolo, video_path, output_path, input_size=416, show=False, C
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(vid.get(cv2.CAP_PROP_FPS))
-    codec = cv2.VideoWriter_fourcc(*'XVID')
+    # codec = cv2.VideoWriter_fourcc(*'XVID')
+    codec = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, codec, fps, (width, height)) # output_path must be .mp4
 
     NUM_CLASS = read_class_names(CLASSES)
@@ -85,6 +86,8 @@ def Object_tracking(Yolo, video_path, output_path, input_size=416, show=False, C
 
         bboxes = postprocess_boxes(pred_bbox, original_frame, input_size, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
+        print(bboxes)
+        debugging = input('Enter something')
 
         # extract bboxes to boxes (x, y, width, height), scores and names
         boxes, scores, names = [], [], []
