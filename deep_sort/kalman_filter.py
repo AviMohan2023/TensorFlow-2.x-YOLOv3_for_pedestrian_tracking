@@ -52,7 +52,8 @@ class KalmanFilter(object):
         self._std_weight_position = 1. / 20
         self._std_weight_velocity = 1. / 160
 
-    def quantizer(self,x=1.5, y=-3.3,num_bits = 12, arithmetic_operation = 'product'):
+    def quantizer(self,x=1.5, y=-3.3,num_bits = 2, arithmetic_operation = 'product'):
+      print(f'number of bits = {num_bits}')
       M = max(np.abs(x),np.abs(y))
       x_01 = np.abs(x)/M
       y_01 = np.abs(y)/M
@@ -65,6 +66,8 @@ class KalmanFilter(object):
           result = -1.00 * result
       elif arithmetic_operation == 'addition':
         result = x_fixedpoint + y_fixedpoint
+        if np.sign(x+y)<0:
+          result = -1.00 * result
       
       unquantized_result = (1/(2**(2*num_bits))) * result * (M**2)
 
@@ -108,7 +111,7 @@ class KalmanFilter(object):
 
 
         std_quantized = [
-            self.quantizer(2 * self._std_weight_position , measurement[3], num_bits=8, arithmetic_operation = 'product'),
+            self.quantizer(2 * self._std_weight_position , measurement[3], arithmetic_operation = 'product'),
             self.quantizer(2 * self._std_weight_position , measurement[3]),
             1e-2,
             self.quantizer(2 * self._std_weight_position , measurement[3]),
@@ -119,7 +122,7 @@ class KalmanFilter(object):
         #covariance_fixed_point = np.diag(np.square(std)) 
         covariance_fixed_point = np.zeros_like(covariance)
         for diagonal_entry in range(measurement.shape[0]):
-          covariance_fixed_point[diagonal_entry][diagonal_entry] = self.quantizer(std_quantized[diagonal_entry],std_quantized[diagonal_entry],num_bits=14,arithmetic_operation = 'product')
+          covariance_fixed_point[diagonal_entry][diagonal_entry] = self.quantizer(std_quantized[diagonal_entry],std_quantized[diagonal_entry],arithmetic_operation = 'product')
 
         print(f'standard deviation in fized point precision = {std_quantized}')
 
@@ -160,7 +163,7 @@ class KalmanFilter(object):
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
         std_pos_fixed_point = [
-            self.quantizer(self._std_weight_position , mean[3], num_bits=8, arithmetic_operation='product'),
+            self.quantizer(self._std_weight_position , mean[3], arithmetic_operation='product'),
             self.quantizer(self._std_weight_position , mean[3]),
             1e-2,
             self.quantizer(self._std_weight_position , mean[3])]
@@ -169,11 +172,13 @@ class KalmanFilter(object):
             self.quantizer(self._std_weight_velocity , mean[3]),
             1e-5,
             self.quantizer(self._std_weight_velocity , mean[3])]
-        motion_cov = np.diag(np.square(np.r_[std_pos_fixed_point, std_vel_fixed_point]))
+        motion_cov_fixed_point = np.diag(np.square(np.r_[std_pos_fixed_point, std_vel_fixed_point]))
 
         mean = np.dot(self._motion_mat, mean)
-        covariance = np.linalg.multi_dot((
-            self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
+        # covariance = np.linalg.multi_dot((
+        #     self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
+        covariance = self.quantizer(np.linalg.multi_dot((
+            self._motion_mat, covariance, self._motion_mat.T)) , motion_cov_fixed_point, arithmetic_operation='addition')
 
         return mean, covariance
 
@@ -212,7 +217,7 @@ class KalmanFilter(object):
         covariance = np.linalg.multi_dot((
             self._update_mat, covariance, self._update_mat.T))
         #return mean, covariance + innovation_cov
-        return mean, covariance + innovation_cov_fixed_point
+        return mean, self.quantizer(covariance , innovation_cov_fixed_point, arithmetic_operation='addition')
 
     def update(self, mean, covariance, measurement):
         """Run Kalman filter correction step.
