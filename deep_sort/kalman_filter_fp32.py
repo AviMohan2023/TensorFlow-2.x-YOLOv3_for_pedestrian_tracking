@@ -52,26 +52,6 @@ class KalmanFilter(object):
         self._std_weight_position = 1. / 20
         self._std_weight_velocity = 1. / 160
 
-    def quantizer(self,x=1.5, y=-3.3,num_bits = 12, arithmetic_operation = 'product'):
-      M = max(np.abs(x),np.abs(y))
-      x_01 = np.abs(x)/M
-      y_01 = np.abs(y)/M
-      x_fixedpoint = np.floor((2 ** num_bits) * x_01)
-      y_fixedpoint = np.floor((2 ** num_bits) * y_01)
-
-      if arithmetic_operation == 'product':
-        result = x_fixedpoint * y_fixedpoint
-        if x*y<0:
-          result = -1.00 * result
-      elif arithmetic_operation == 'addition':
-        result = x_fixedpoint + y_fixedpoint
-      
-      unquantized_result = (1/(2**(2*num_bits))) * result * (M**2)
-
-      return unquantized_result 
-
-
-
     def initiate(self, measurement):
         """Create track from unassociated measurement.
 
@@ -103,30 +83,7 @@ class KalmanFilter(object):
             1e-5,
             10 * self._std_weight_velocity * measurement[3]]
         covariance = np.diag(np.square(std))
-
-        print(f'standard deviation in fp32 = {std}')
-
-
-        std_quantized = [
-            self.quantizer(2 * self._std_weight_position , measurement[3], num_bits=8, arithmetic_operation = 'product'),
-            self.quantizer(2 * self._std_weight_position , measurement[3]),
-            1e-2,
-            self.quantizer(2 * self._std_weight_position , measurement[3]),
-            self.quantizer(10 * self._std_weight_velocity , measurement[3]),
-            self.quantizer(10 * self._std_weight_velocity , measurement[3]),
-            1e-5,
-            self.quantizer(10 * self._std_weight_velocity , measurement[3])]
-        #covariance_fixed_point = np.diag(np.square(std)) 
-        covariance_fixed_point = np.zeros_like(covariance)
-        for diagonal_entry in range(measurement.shape[0]):
-          covariance_fixed_point[diagonal_entry][diagonal_entry] = self.quantizer(std_quantized[diagonal_entry],std_quantized[diagonal_entry],num_bits=14,arithmetic_operation = 'product')
-
-        print(f'standard deviation in fized point precision = {std_quantized}')
-
-        print(f'Covariance in fp32 = {covariance}')  
-        print(f'Covariance in fixed point 8 bit format = {covariance_fixed_point} ')
-
-        return mean, covariance_fixed_point
+        return mean, covariance
 
     def predict(self, mean, covariance):
         """Run Kalman filter prediction step.
@@ -159,18 +116,6 @@ class KalmanFilter(object):
             self._std_weight_velocity * mean[3]]
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
-        std_pos_fixed_point = [
-            self.quantizer(self._std_weight_position , mean[3], num_bits=8, arithmetic_operation='product'),
-            self.quantizer(self._std_weight_position , mean[3]),
-            1e-2,
-            self.quantizer(self._std_weight_position , mean[3])]
-        std_vel_fixed_point = [
-            self.quanitzer(self._std_weight_velocity , mean[3]),
-            self.quantizer(self._std_weight_velocity , mean[3]),
-            1e-5,
-            self.quantizer(self._std_weight_velocity , mean[3])]
-        motion_cov = np.diag(np.square(np.r_[std_pos_fixed_point, std_vel_fixed_point]))
-
         mean = np.dot(self._motion_mat, mean)
         covariance = np.linalg.multi_dot((
             self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
@@ -201,18 +146,10 @@ class KalmanFilter(object):
             self._std_weight_position * mean[3]]
         innovation_cov = np.diag(np.square(std))
 
-        std_fixed_point = [
-            self.quantizer(self._std_weight_position , mean[3]),
-            self.quantizer(self._std_weight_position , mean[3]),
-            1e-1,
-            self.quantizer(self._std_weight_position , mean[3])]
-        innovation_cov_fixed_point = np.diag(np.square(std_fixed_point))
-
         mean = np.dot(self._update_mat, mean)
         covariance = np.linalg.multi_dot((
             self._update_mat, covariance, self._update_mat.T))
-        #return mean, covariance + innovation_cov
-        return mean, covariance + innovation_cov_fixed_point
+        return mean, covariance + innovation_cov
 
     def update(self, mean, covariance, measurement):
         """Run Kalman filter correction step.
